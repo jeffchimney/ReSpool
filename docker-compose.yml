@@ -15,15 +15,18 @@ services:
       # Turns on "Add audio". Remove it to keep ReSpool read-only.
       RESPOOL_UPLOAD_DIR: /uploads
       # RESPOOL_UPLOAD_LIMIT_MB: 8192
-      # A secret that must prefix every URL: http://<host>:8080/<token>/
-      # Generate one with: openssl rand -hex 16
+      # A secret that every URL starts with: http://<host>:8080/<token>/
+      # Generate one with `openssl rand -hex 16` and keep it: changing it
+      # breaks every feed you've subscribed to. Left empty, anyone on your
+      # network can browse and download your library.
       RESPOOL_TOKEN: ""
       # Set this when feeds are reached through a reverse proxy or tunnel,
       # e.g. https://respool.your-tailnet.ts.net
       # RESPOOL_BASE_URL: ""
       # RESPOOL_SCAN_INTERVAL: 5m
     # ReSpool runs as uid 65532. If your files aren't world-readable, run it
-    # as a user that can read them instead:
+    # as a user that can read them instead (and keep uploads in a host
+    # folder that user can write to; see "File permissions" in the README):
     # user: "1000:1000"
 
 volumes:

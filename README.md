@@ -21,19 +21,78 @@ Spool podcast app, and it works with any app that can add a feed by URL.
 
 ## Quick start
 
-```sh
-docker run -d --name respool -p 8080:8080 \
-  -v /path/to/audiobooks:/media:ro \
-  -v respool-uploads:/uploads -e RESPOOL_UPLOAD_DIR=/uploads \
-  -e RESPOOL_TOKEN="$(openssl rand -hex 16)" \
-  ghcr.io/jeffchimney/respool:latest
+You need Docker and a folder of audio files.
 
-docker logs respool   # shows the index URL, including your token
+1. **Make a token**, a secret that every ReSpool URL starts with. Write it
+   down and reuse it: if the token changes, every feed you've subscribed to
+   stops working.
+
+   ```sh
+   openssl rand -hex 16
+   ```
+
+2. **Start ReSpool** with your folder and token:
+
+   ```sh
+   docker run -d --name respool --restart unless-stopped -p 8080:8080 \
+     -v /path/to/audiobooks:/media:ro \
+     -v respool-uploads:/uploads -e RESPOOL_UPLOAD_DIR=/uploads \
+     -e RESPOOL_TOKEN=your-token \
+     ghcr.io/jeffchimney/respool:latest
+   ```
+
+   Leave out the `respool-uploads` line if you only want to serve the media
+   folder.
+
+3. **Open `http://<server-ip>:8080/<your-token>/`**, where `<server-ip>` is
+   the address of the machine running Docker. On a computer, the page shows a
+   QR code you can scan to open it on your phone.
+
+4. **Subscribe:** copy a book's feed URL and add it to your podcast app. In
+   Spool, paste it into search.
+
+If the page is empty or won't load, `docker logs respool` shows what went
+wrong, such as a folder ReSpool can't read (see
+[File permissions](#file-permissions)).
+
+### Docker Compose
+
+Download [docker-compose.yml](docker-compose.yml), set your media folder and
+token in it, then start it:
+
+```sh
+curl -O https://raw.githubusercontent.com/jeffchimney/ReSpool/main/docker-compose.yml
+docker compose up -d
 ```
 
-Open `http://<server-ip>:8080/<token>/` and copy a feed into your podcast app.
-There's also a [docker-compose.yml](docker-compose.yml). Leave out the
-uploads lines if you only want to serve the media folder.
+### Updating
+
+Pull the new image and recreate the container with the **same token**.
+Uploads are kept in the `respool-uploads` volume.
+
+```sh
+docker pull ghcr.io/jeffchimney/respool:latest
+docker rm -f respool
+```
+
+Then run the `docker run` command from step 2 again. With Compose, run
+`docker compose pull && docker compose up -d`.
+
+### File permissions
+
+ReSpool runs as an unprivileged user (uid 65532), not root. It has to be
+able to read your media folder and, if uploads are on, write to the uploads
+folder.
+
+- **Media folder:** if your audio files aren't readable by everyone, run
+  ReSpool as a user who can read them. Add `--user 1000:1000` to
+  `docker run` (or `user: "1000:1000"` in Compose), using the user and group
+  IDs that `id` prints for that user.
+- **Uploads folder:** the `respool-uploads` volume works as is, unless you
+  use `--user`. To keep uploads in a folder on the host instead, mount it
+  with `-v /path/to/uploads:/uploads` and give the user ReSpool runs as write
+  access, for example `sudo chown 65532:65532 /path/to/uploads`. With
+  `--user`, chown it to that user instead.
 
 ## How folders become feeds
 
