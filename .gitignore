@@ -1,0 +1,5 @@
+/bin/
+/respool
+*.test
+*.out
+.DS_Store

@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReSpool</title>
+{{if or (not .Ready) .Scanning}}<noscript><meta http-equiv="refresh" content="2"></noscript>{{end}}
+<link rel="icon" type="image/svg+xml" href="icon.svg?v=2">
+<style>
+/* Spool's palette: the brand gradient and accent from its asset catalogue,
+   true white and black grounds, raised surfaces with a hairline border. */
+:root {
+  --bg: #ffffff;
+  --raised: #f5f5f5;
+  --line: rgba(98, 92, 86, 0.12);
+  --ink: #000000;
+  --muted: rgba(60, 60, 67, 0.6);
+  --field: #ffffff;
+  --accent: #eb3349;
+  --accent-soft: rgba(235, 51, 73, 0.12);
+  --brand: linear-gradient(135deg, #eb3349, #f45c43);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --raised: #111111;
+    --line: rgba(255, 255, 255, 0.12);
+    --ink: #ffffff;
+    --muted: rgba(235, 235, 245, 0.6);
+    --field: #000000;
+    --accent-soft: rgba(235, 51, 73, 0.2);
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 17px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+header { display: flex; align-items: center; gap: 14px; padding: 32px 0 20px; }
+.mark { width: 52px; height: 52px; flex: none; border-radius: 12px; box-shadow: 0 4px 14px rgba(225, 19, 58, 0.28); }
+h1 { margin: 0; font-size: 34px; line-height: 1.1; font-weight: 700; letter-spacing: 0.01em; }
+.sub { margin: 2px 0 0; color: var(--muted); font-size: 15px; }
+
+.hero {
+  display: flex; gap: 22px; align-items: center; justify-content: space-between;
+  background: var(--brand); color: #fff;
+  border-radius: 22px; padding: 22px 24px; margin-bottom: 22px;
+}
+.hero h2 { margin: 0 0 6px; font-size: 22px; line-height: 1.2; font-weight: 700; }
+.hero p { margin: 0; font-size: 15px; color: rgba(255, 255, 255, 0.88); max-width: 62ch; }
+.hero p + p { margin-top: 8px; }
+.hero code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; background: rgba(255, 255, 255, 0.18); padding: 1px 6px; border-radius: 6px; }
+.qr { display: none; flex: none; margin: 0; text-align: center; font-size: 13px; font-weight: 600; }
+.qr img { display: block; width: 112px; height: 112px; background: #fff; padding: 7px; border-radius: 14px; margin-bottom: 6px; }
+@media (min-width: 820px) { .qr { display: block; } }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 26px; }
+.search {
+  flex: 1 1 260px; min-width: 0; display: flex; align-items: center; gap: 8px;
+  background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 0 12px;
+  color: var(--muted);
+}
+.search svg { width: 17px; height: 17px; flex: none; }
+.search input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; padding: 10px 0; outline: none; }
+.search:focus-within { border-color: var(--accent); }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px; border-radius: 999px; border: 0;
+  background: var(--accent-soft); color: var(--accent);
+  font: inherit; font-size: 15px; font-weight: 600; text-decoration: none; white-space: nowrap; cursor: pointer;
+}
+.pill svg { width: 16px; height: 16px; }
+.pill:hover { filter: brightness(0.96); }
+.pill.primary { background: var(--brand); color: #fff; }
+.pill:disabled { opacity: 0.5; cursor: default; }
+@media (max-width: 560px) { .search { flex-basis: 100%; } }
+
+.section {
+  display: flex; align-items: center; gap: 6px; margin: 0 0 10px 4px;
+  font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted);
+}
+.section svg { width: 15px; height: 15px; color: var(--accent); }
+
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); }
+.book {
+  position: relative; display: flex; gap: 14px; padding: 12px; min-width: 0;
+  background: var(--raised); border: 1px solid var(--line); border-radius: 14px;
+}
+.manage {
+  position: absolute; top: 10px; right: 10px; width: 30px; height: 30px;
+  display: grid; place-items: center; border: 0; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); cursor: pointer;
+}
+.manage svg { width: 16px; height: 16px; }
+.uploaded .author, .uploaded .info h2 { padding-right: 32px; }
+.art { position: relative; flex: none; width: 96px; height: 96px; border-radius: 10px; overflow: hidden; background: var(--line); }
+.art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.info { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.author { margin: 0; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.info h2 { margin: 1px 0 0; font-size: 17px; line-height: 1.25; font-weight: 600; overflow-wrap: anywhere; }
+.meta { margin: 2px 0 10px; color: var(--muted); font-size: 13px; }
+.copy { display: flex; gap: 8px; margin-top: auto; }
+.copy input {
+  flex: 1; min-width: 0; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--field); color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.copy button {
+  flex: none; padding: 7px 14px; border-radius: 999px; border: 0;
+  background: var(--brand); color: #fff; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.copy button.done { background: var(--accent-soft); color: var(--accent); }
+
+.notice { background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 30px; text-align: center; color: var(--muted); }
+.notice h2 { color: var(--ink); margin: 0 0 6px; font-size: 20px; }
+.notice p { margin: 0; }
+
+footer { color: var(--muted); font-size: 13px; padding: 30px 4px 44px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.warn { color: var(--accent); }
+
+dialog {
+  width: min(520px, calc(100vw - 32px)); padding: 0;
+  border: 1px solid var(--line); border-radius: 22px;
+  background: var(--bg); color: var(--ink); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+dialog form { display: flex; flex-direction: column; gap: 14px; padding: 22px; }
+dialog h2 { margin: 0; font-size: 22px; line-height: 1.2; }
+.hint { margin: -6px 0 0; color: var(--muted); font-size: 14px; }
+.drop {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 24px 16px; text-align: center; cursor: pointer;
+  background: var(--raised); border: 2px dashed var(--line); border-radius: 16px;
+  color: var(--muted); font-size: 15px;
+}
+.drop svg { width: 30px; height: 30px; color: var(--accent); margin-bottom: 4px; }
+.drop strong { color: var(--accent); }
+.drop span { font-size: 13px; overflow-wrap: anywhere; }
+.drop.over, .drop:focus-within { border-color: var(--accent); }
+.drop input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) { .fields { grid-template-columns: 1fr; } }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.field input, .field select {
+  font: inherit; font-size: 16px; font-weight: 400; color: var(--ink);
+  background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px;
+}
+.field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+progress { width: 100%; height: 6px; accent-color: var(--accent); }
+.status { margin: 0; min-height: 1.4em; font-size: 14px; color: var(--muted); }
+.status.error { color: var(--accent); }
+.field textarea {
+  font: inherit; font-size: 16px; font-weight: 400; color: var(--ink); resize: vertical; min-height: 76px;
+  background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px;
+}
+.field textarea:focus { outline: none; border-color: var(--accent); }
+.cover-row { display: flex; align-items: center; gap: 12px; }
+.cover-row img { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; background: var(--line); }
+.files {
+  list-style: none; margin: 0; padding: 0; max-height: 230px; overflow: auto;
+  background: var(--raised); border: 1px solid var(--line); border-radius: 12px;
+}
+.files li { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 12px; border-top: 1px solid var(--line); }
+.files li:first-child { border-top: 0; }
+.files li div { flex: 1; min-width: 0; }
+.files strong, .files span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.files strong { color: var(--ink); font-size: 15px; font-weight: 600; }
+.files span { color: var(--muted); font-size: 12px; font-weight: 400; }
+.files button {
+  flex: none; width: 32px; height: 32px; display: grid; place-items: center;
+  border: 0; border-radius: 999px; background: none; color: var(--muted); cursor: pointer;
+}
+.files button:hover { color: var(--accent); background: var(--accent-soft); }
+.files button svg { width: 17px; height: 17px; }
+.actions { flex-wrap: wrap; }
+.pill.danger { margin-right: auto; padding-left: 4px; padding-right: 4px; background: none; }
+.pill.solid-danger { background: var(--accent); color: #fff; }
+dialog.confirm { width: min(400px, calc(100vw - 32px)); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.actions { display: flex; justify-content: flex-end; gap: 10px; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap"{{if or (not .Ready) .Scanning}} data-refresh{{end}}>
+  <header>
+    <img class="mark" src="icon.svg?v=2" alt="">
+    <div>
+      <h1>ReSpool</h1>
+      {{if .Ready}}<p class="sub">{{len .Books}} {{if eq (len .Books) 1}}book{{else}}books{{end}} · {{.Episodes}} files{{with .Duration}} · {{.}}{{end}}</p>{{end}}
+    </div>
+  </header>
+
+  <section class="hero">
+    <div>
+      <h2>Copy a feed, paste it into Spool.</h2>
+      <p>Paste the URL into Spool's search field, or into any podcast app that takes a feed URL. Every folder of audio files is its own feed, and new files appear after the next scan.</p>
+      {{if .Loopback}}<p>To subscribe from your phone, open this page at this computer's network address, like <code>http://192.168.1.20:8080</code>, instead of localhost.</p>{{end}}
+    </div>
+    {{if not .Loopback}}<figure class="qr"><img src="{{.QRURL}}" alt="QR code for this page"><figcaption>Open on your phone</figcaption></figure>{{end}}
+  </section>
+
+  <div class="toolbar">
+    <label class="search">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6"/><path d="M13 13l5 5"/></svg>
+      <input id="search" type="search" placeholder="Search" aria-label="Search books" autocomplete="off">
+    </label>
+    <form method="post" action="rescan"><button class="pill" type="submit">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 10a6.5 6.5 0 1 1-2-4.7"/><path d="M15 2.5v3.5h-3.5"/></svg>
+      {{if .Scanning}}Scanning…{{else}}Rescan{{end}}</button></form>
+    <a class="pill" href="{{.OPMLURL}}">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10M6 9l4 4 4-4"/><path d="M4 16h12"/></svg>
+      Export OPML</a>
+    {{if .Uploads}}<button class="pill primary" type="button" id="add-audio">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
+      Add audio</button>{{end}}
+  </div>
+
+  {{if not .Ready}}
+  <div class="notice"><h2>Scanning your library…</h2><p>This page refreshes when it's done.</p></div>
+  {{else if not .Books}}
+  <div class="notice"><h2>No audio found yet</h2><p>{{if .Uploads}}Press Add audio to upload a book, or put{{else}}Put{{end}} each audiobook in its own folder inside your media folder, then press Rescan.</p></div>
+  {{else}}
+  <h3 class="section">
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="2" y="4" width="16" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="7" cy="9" r="2"/><circle cx="13" cy="9" r="2"/><rect x="7" y="15.5" width="6" height="1.8" rx=".9"/></svg>
+    Library
+  </h3>
+  <div class="grid" id="books">
+    {{range .Books}}
+    <article class="book{{if .Uploaded}} uploaded{{end}}" data-search="{{.Search}}">
+      {{if .Uploaded}}<button type="button" class="manage" data-edit="{{.ID}}" title="Edit" aria-label="Edit {{.Title}}">
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="4.5" cy="10" r="1.8"/><circle cx="10" cy="10" r="1.8"/><circle cx="15.5" cy="10" r="1.8"/></svg>
+      </button>{{end}}
+      <div class="art">
+        <img src="{{.CoverURL}}" alt="" loading="lazy">
+      </div>
+      <div class="info">
+        {{with .Author}}<p class="author">{{.}}</p>{{end}}
+        <h2>{{.Title}}</h2>
+        <p class="meta">{{.Episodes}} {{if eq .Episodes 1}}file{{else}}files{{end}}{{with .Duration}} · {{.}}{{end}}{{if .Uploaded}} · Uploaded{{end}}</p>
+        <div class="copy">
+          <input id="feed-{{.ID}}" value="{{.FeedURL}}" readonly aria-label="Feed URL for {{.Title}}">
+          <button type="button" data-copy="feed-{{.ID}}">Copy</button>
+        </div>
+      </div>
+    </article>
+    {{end}}
+  </div>
+  <div class="notice" id="no-match" hidden><p>No books match that search.</p></div>
+  {{end}}
+
+  <footer>
+    <span>ReSpool {{.Version}}</span>
+    {{with .Scanned}}<span>Last scanned <time id="scanned" datetime="{{.}}">{{.}}</time></span>{{end}}
+    {{if not .TokenSet}}<span class="warn">No access token set: anyone who can reach this server can open your feeds{{if .Uploads}} and upload files{{end}}.</span>{{end}}
+  </footer>
+</div>
+{{if .Uploads}}
+<dialog id="upload-dialog" aria-labelledby="upload-title">
+  <form id="upload-form">
+    <h2 id="upload-title">Add audio</h2>
+    <p class="hint">ReSpool keeps uploads in its uploads folder and turns them into a book you can follow. Up to {{.UploadLimit}} at a time.</p>
+    <label class="drop" id="drop">
+      <input id="upload-files" type="file" multiple accept="audio/*,.mp3,.m4a,.m4b,.aac,.flac,.ogg,.oga,.opus,.wav,image/jpeg,image/png">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+      <div><strong>Choose files</strong> or drop them here</div>
+      <span id="picked">MP3, M4A, M4B, AAC, FLAC, Ogg, Opus or WAV. Add a JPEG or PNG to use as the cover.</span>
+    </label>
+    {{if .UploadBooks}}
+    <label class="field">Add to
+      <select id="upload-into" name="into">
+        <option value="">A new book</option>
+        {{range .UploadBooks}}<option value="{{.ID}}">{{.Title}}</option>{{end}}
+      </select>
+    </label>
+    {{end}}
+    <div class="fields" id="new-book">
+      <label class="field">Title<input name="title" placeholder="From the files' tags" autocomplete="off"></label>
+      <label class="field">Author<input name="author" placeholder="From the files' tags" autocomplete="off"></label>
+    </div>
+    <progress id="upload-progress" max="1" value="0" hidden></progress>
+    <p id="upload-status" class="status" role="status" aria-live="polite"></p>
+    <div class="actions">
+      <button type="button" class="pill" id="upload-cancel">Cancel</button>
+      <button type="submit" class="pill primary" id="upload-submit">Upload</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="edit-dialog" aria-labelledby="edit-title">
+  <form id="edit-form">
+    <h2 id="edit-title">Edit book</h2>
+    <p class="hint">Changes what podcast apps show. The feed URL stays the same, so subscriptions keep working. Leave a field empty to use the files' tags.</p>
+    <div class="fields">
+      <label class="field">Title<input name="title" placeholder="From the files' tags" autocomplete="off"></label>
+      <label class="field">Author<input name="author" placeholder="From the files' tags" autocomplete="off"></label>
+    </div>
+    <label class="field">Description<textarea name="description" rows="3" placeholder="Optional"></textarea></label>
+    <div class="field">Cover
+      <div class="cover-row">
+        <img id="edit-cover-img" alt="">
+        <label class="pill">Choose an image<input id="edit-cover" class="visually-hidden" type="file" accept="image/jpeg,image/png"></label>
+      </div>
+    </div>
+    <div class="field">Files
+      <ul class="files" id="edit-files"></ul>
+    </div>
+    <p id="edit-status" class="status" role="status" aria-live="polite"></p>
+    <div class="actions">
+      <button type="button" class="pill danger" id="edit-delete">Delete book</button>
+      <button type="button" class="pill" id="edit-add">Add audio</button>
+      <button type="button" class="pill" id="edit-cancel">Close</button>
+      <button type="submit" class="pill primary" id="edit-save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="confirm-dialog" class="confirm" aria-labelledby="confirm-title">
+  <form method="dialog">
+    <h2 id="confirm-title"></h2>
+    <p class="hint" id="confirm-text"></p>
+    <div class="actions">
+      <button class="pill" value="cancel">Cancel</button>
+      <button class="pill solid-danger" value="ok" id="confirm-ok">Delete</button>
+    </div>
+  </form>
+</dialog>
+{{end}}
+<script>
+(function () {
+  // navigator.clipboard only exists on HTTPS or localhost, so fall back to a
+  // selected textarea and execCommand for plain-HTTP LAN addresses.
+  function copy(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).then(function () { return true; }, function () { return legacyCopy(text); });
+    }
+    return Promise.resolve(legacyCopy(text));
+  }
+  function legacyCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+  document.querySelectorAll("[data-copy]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var input = document.getElementById(btn.dataset.copy);
+      copy(input.value).then(function (ok) {
+        if (!ok) { input.focus(); input.select(); }
+        btn.textContent = ok ? "Copied" : "Select";
+        btn.classList.toggle("done", ok);
+        setTimeout(function () { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1600);
+      });
+    });
+  });
+  // The server (often a container on UTC) sends ISO time; show it in the
+  // viewer's own time zone.
+  var scanned = document.getElementById("scanned");
+  if (scanned) {
+    var d = new Date(scanned.getAttribute("datetime"));
+    if (!isNaN(d)) scanned.textContent = d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  }
+  var search = document.getElementById("search");
+  var books = document.querySelectorAll(".book");
+  var none = document.getElementById("no-match");
+  search.addEventListener("input", function () {
+    var q = search.value.trim().toLowerCase();
+    var shown = 0;
+    books.forEach(function (b) {
+      var match = !q || b.dataset.search.indexOf(q) !== -1;
+      b.hidden = !match;
+      if (match) shown++;
+    });
+    if (none) none.hidden = shown !== 0;
+  });
+
+  var dialog = document.getElementById("upload-dialog");
+
+  // While a scan runs the page refreshes itself, but never in the middle of
+  // an upload.
+  if (document.querySelector("[data-refresh]")) {
+    setTimeout(function refresh() {
+      if (dialog && dialog.open) return setTimeout(refresh, 2000);
+      location.reload();
+    }, 2000);
+  }
+
+  if (!dialog) return;
+  var form = document.getElementById("upload-form");
+  var input = document.getElementById("upload-files");
+  var drop = document.getElementById("drop");
+  var picked = document.getElementById("picked");
+  var into = document.getElementById("upload-into");
+  var newBook = document.getElementById("new-book");
+  var progress = document.getElementById("upload-progress");
+  var status = document.getElementById("upload-status");
+  var submit = document.getElementById("upload-submit");
+  var pickedHint = picked.textContent;
+  var files = [];
+  var xhr = null;
+
+  function size(n) {
+    var units = ["bytes", "KB", "MB", "GB", "TB"], i = 0;
+    while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+    return (i ? n.toFixed(1) : n) + " " + units[i];
+  }
+  function setFiles(list) {
+    files = Array.prototype.slice.call(list);
+    if (!files.length) { picked.textContent = pickedHint; return; }
+    var total = files.reduce(function (n, f) { return n + f.size; }, 0);
+    var names = files.slice(0, 3).map(function (f) { return f.name; }).join(", ");
+    picked.textContent = files.length + (files.length === 1 ? " file, " : " files, ") + size(total) + ": " +
+      names + (files.length > 3 ? " and " + (files.length - 3) + " more" : "");
+  }
+  function say(text, isError) {
+    status.textContent = text;
+    status.classList.toggle("error", !!isError);
+  }
+  function finish() {
+    xhr = null;
+    submit.disabled = false;
+    progress.hidden = true;
+  }
+  function open(list) {
+    if (list) setFiles(list);
+    say("");
+    dialog.showModal();
+  }
+
+  document.getElementById("add-audio").addEventListener("click", function () {
+    if (into) { into.value = ""; newBook.hidden = false; }
+    open();
+  });
+  document.getElementById("upload-cancel").addEventListener("click", function () {
+    if (xhr) xhr.abort();
+    dialog.close();
+  });
+  dialog.addEventListener("cancel", function () { if (xhr) xhr.abort(); });
+  input.addEventListener("change", function () { setFiles(input.files); });
+  if (into) into.addEventListener("change", function () { newBook.hidden = !!into.value; });
+
+  ["dragenter", "dragover"].forEach(function (type) {
+    drop.addEventListener(type, function (e) { e.preventDefault(); drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (type) {
+    drop.addEventListener(type, function (e) { e.preventDefault(); drop.classList.remove("over"); });
+  });
+  drop.addEventListener("drop", function (e) {
+    if (e.dataTransfer && e.dataTransfer.files.length) setFiles(e.dataTransfer.files);
+  });
+  // Dropping files anywhere on the page opens the dialog with them.
+  function hasFiles(e) {
+    return e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types, "Files") !== -1;
+  }
+  document.addEventListener("dragover", function (e) { if (hasFiles(e)) e.preventDefault(); });
+  document.addEventListener("drop", function (e) {
+    if (!hasFiles(e) || dialog.open) return;
+    e.preventDefault();
+    open(e.dataTransfer.files);
+  });
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (xhr) return;
+    if (!files.length) { say("Choose at least one audio file.", true); return; }
+    var data = new FormData();
+    ["into", "title", "author"].forEach(function (name) {
+      var field = form.elements[name];
+      if (field && field.value.trim()) data.append(name, field.value.trim());
+    });
+    files.forEach(function (f) { data.append("files", f, f.name); });
+
+    xhr = new XMLHttpRequest();
+    xhr.open("POST", "upload");
+    xhr.setRequestHeader("X-Requested-With", "ReSpool");
+    xhr.upload.onprogress = function (ev) {
+      if (!ev.lengthComputable) return;
+      progress.value = ev.loaded / ev.total;
+      say("Uploading… " + Math.floor(ev.loaded / ev.total * 100) + "%");
+    };
+    xhr.upload.onload = function () {
+      progress.removeAttribute("value"); // indeterminate while the server files it
+      say("Processing…");
+    };
+    xhr.onload = function () {
+      var res = {};
+      try { res = JSON.parse(xhr.responseText); } catch (err) {}
+      if (xhr.status === 200) {
+        say("Added " + res.files + (res.files === 1 ? " file" : " files") + (res.title ? " to " + res.title : "") + ".");
+        setTimeout(function () { location.reload(); }, 900);
+        return;
+      }
+      finish();
+      say(res.error || "The upload failed (" + xhr.status + ").", true);
+    };
+    xhr.onerror = function () { finish(); say("The upload failed. Check your connection and try again.", true); };
+    xhr.onabort = function () { finish(); say(""); };
+
+    progress.value = 0;
+    progress.hidden = false;
+    submit.disabled = true;
+    say("Uploading…");
+    xhr.send(data);
+  });
+
+  // Editing uploaded books.
+  var editDialog = document.getElementById("edit-dialog");
+  var editForm = document.getElementById("edit-form");
+  var editStatus = document.getElementById("edit-status");
+  var editFiles = document.getElementById("edit-files");
+  var editCover = document.getElementById("edit-cover");
+  var editCoverImg = document.getElementById("edit-cover-img");
+  var editSave = document.getElementById("edit-save");
+  var confirmDialog = document.getElementById("confirm-dialog");
+  var trash = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5.5h13M8 5.5V3.8h4v1.7M5.5 5.5l.8 10.7h7.4l.8-10.7"/></svg>';
+  var book = null;
+  var changed = false; // reload when the dialog closes
+  var reloadAfterUpload = false;
+
+  function editSay(text, isError) {
+    editStatus.textContent = text;
+    editStatus.classList.toggle("error", !!isError);
+  }
+  // Calls ReSpool with its header, rejecting with the server's message.
+  function api(method, url, body) {
+    var opts = { method: method, headers: { "X-Requested-With": "ReSpool" } };
+    if (body instanceof FormData) {
+      opts.body = body;
+    } else if (body !== undefined) {
+      opts.headers["Content-Type"] = "application/json";
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(url, opts).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok) throw new Error(data.error || "That didn't work (" + res.status + ").");
+        return data;
+      });
+    });
+  }
+  function confirmAction(title, text, action) {
+    document.getElementById("confirm-title").textContent = title;
+    document.getElementById("confirm-text").textContent = text;
+    document.getElementById("confirm-ok").textContent = action;
+    confirmDialog.returnValue = "";
+    confirmDialog.showModal();
+    return new Promise(function (resolve) {
+      confirmDialog.addEventListener("close", function () { resolve(confirmDialog.returnValue === "ok"); }, { once: true });
+    });
+  }
+  function renderFiles() {
+    editFiles.textContent = "";
+    book.files.forEach(function (f) {
+      var li = document.createElement("li");
+      var text = document.createElement("div");
+      var title = document.createElement("strong");
+      var detail = document.createElement("span");
+      title.textContent = f.title;
+      detail.textContent = [f.name, f.duration, f.size].filter(Boolean).join(" · ");
+      text.append(title, detail);
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.title = "Remove";
+      remove.setAttribute("aria-label", "Remove " + f.name);
+      remove.innerHTML = trash;
+      remove.addEventListener("click", function () { removeFile(f); });
+      li.append(text, remove);
+      editFiles.append(li);
+    });
+  }
+  function removeFile(f) {
+    var last = book.files.length === 1;
+    confirmAction(
+      "Remove " + f.name + "?",
+      last ? "It's the only file in " + book.title + ", so the whole book will be deleted. This can't be undone."
+           : "It's deleted from ReSpool's uploads folder. This can't be undone.",
+      last ? "Delete book" : "Remove"
+    ).then(function (ok) {
+      if (!ok) return;
+      api("DELETE", "books/" + book.id + "/files/" + f.id).then(function (res) {
+        changed = true;
+        if (res.bookDeleted) { editDialog.close(); return; }
+        book.files = book.files.filter(function (x) { return x.id !== f.id; });
+        renderFiles();
+        editSay("Removed " + f.name + ".");
+      }, function (err) { editSay(err.message, true); });
+    });
+  }
+  function openEdit(id) {
+    api("GET", "books/" + id).then(function (b) {
+      book = b;
+      changed = false;
+      editForm.elements.title.value = b.title;
+      editForm.elements.author.value = b.author;
+      editForm.elements.description.value = b.description;
+      editCoverImg.src = b.cover;
+      editSave.disabled = false;
+      renderFiles();
+      editSay("");
+      editDialog.showModal();
+    }, function (err) { alert(err.message); });
+  }
+
+  document.querySelectorAll("[data-edit]").forEach(function (btn) {
+    btn.addEventListener("click", function () { openEdit(btn.dataset.edit); });
+  });
+  editDialog.addEventListener("close", function () { if (changed) location.reload(); });
+  dialog.addEventListener("close", function () { if (reloadAfterUpload) location.reload(); });
+  document.getElementById("edit-cancel").addEventListener("click", function () { editDialog.close(); });
+
+  editForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    editSave.disabled = true;
+    editSay("Saving…");
+    api("PATCH", "books/" + book.id, {
+      title: editForm.elements.title.value.trim(),
+      author: editForm.elements.author.value.trim(),
+      description: editForm.elements.description.value.trim()
+    }).then(function () {
+      changed = true;
+      editDialog.close();
+    }, function (err) {
+      editSave.disabled = false;
+      editSay(err.message, true);
+    });
+  });
+
+  editCover.addEventListener("change", function () {
+    var file = editCover.files[0];
+    editCover.value = "";
+    if (!file) return;
+    var data = new FormData();
+    data.append("into", book.id);
+    data.append("files", file, file.name);
+    editSay("Uploading cover…");
+    api("POST", "upload", data).then(function () {
+      changed = true;
+      editCoverImg.src = URL.createObjectURL(file);
+      editSay("Cover updated.");
+    }, function (err) { editSay(err.message, true); });
+  });
+
+  document.getElementById("edit-delete").addEventListener("click", function () {
+    var n = book.files.length;
+    confirmAction(
+      "Delete " + book.title + "?",
+      "The book and its " + (n === 1 ? "file are" : n + " files are") + " deleted from ReSpool's uploads folder, and its feed stops working. This can't be undone.",
+      "Delete book"
+    ).then(function (ok) {
+      if (!ok) return;
+      api("DELETE", "books/" + book.id).then(function () {
+        changed = true;
+        editDialog.close();
+      }, function (err) { editSay(err.message, true); });
+    });
+  });
+
+  // "Add audio" from a book opens the upload dialog with that book picked.
+  document.getElementById("edit-add").addEventListener("click", function () {
+    var id = book.id;
+    reloadAfterUpload = changed;
+    changed = false;
+    editDialog.close();
+    if (into) { into.value = id; newBook.hidden = true; }
+    open();
+  });
+})();
+</script>
+</body>
+</html>

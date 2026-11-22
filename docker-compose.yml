@@ -1,0 +1,30 @@
+services:
+  respool:
+    image: ghcr.io/jeffchimney/respool:latest
+    container_name: respool
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # Your audiobooks, mounted read-only. ReSpool never writes to this folder.
+      - /path/to/audiobooks:/media:ro
+      # Audio added from the web page. A named volume is writable out of the
+      # box; to use a host folder instead, make it writable by uid 65532.
+      - uploads:/uploads
+    environment:
+      # Turns on "Add audio". Remove it to keep ReSpool read-only.
+      RESPOOL_UPLOAD_DIR: /uploads
+      # RESPOOL_UPLOAD_LIMIT_MB: 8192
+      # A secret that must prefix every URL: http://<host>:8080/<token>/
+      # Generate one with: openssl rand -hex 16
+      RESPOOL_TOKEN: ""
+      # Set this when feeds are reached through a reverse proxy or tunnel,
+      # e.g. https://respool.your-tailnet.ts.net
+      # RESPOOL_BASE_URL: ""
+      # RESPOOL_SCAN_INTERVAL: 5m
+    # ReSpool runs as uid 65532. If your files aren't world-readable, run it
+    # as a user that can read them instead:
+    # user: "1000:1000"
+
+volumes:
+  uploads:

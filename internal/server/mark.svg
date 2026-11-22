@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="spool" gradientUnits="userSpaceOnUse"
+                    x1="149.4" y1="-89.9" x2="873.6" y2="1112.9">
+      <stop offset="0" stop-color="#F14E33"/>
+      <stop offset="1" stop-color="#E1133A"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="230" fill="url(#spool)"/>
+  <g id="foreground" fill="#fff">
+    <!-- Cassette from Spool's iOS AppIcon layers. -->
+    <g transform="translate(8 181) scale(.85)">
+      <path fill="none" stroke="#fff" stroke-width="16" stroke-linecap="round"
+        d="M191.765 573.682 189.631 581.017 M182.369 605.983 180.235 613.318
+           M846.278 556.897 848.194 568.743 M852.806 597.257 854.722 609.103
+           M247 693 255 693 M281 693 289 693
+           M315 693 323 693 M701 693 709 693
+           M735 693 743 693 M769 693 777 693
+           M450 771 438 771 M404.645 771 392.645 771
+           M359.29 771 347.29 771.002 M314.129 774.07 302.513 777.059
+           M274.964 794.851 269.974 805.683 M274.909 837.959 282.398 847.272
+           M313.057 858.521 325.031 857.916 M357.654 851.247 369.061 847.527
+           M399.965 835.005 410.837 829.925 M440.515 814.708 451.03 808.926
+           M574 771 586 771 M619.355 771 631.355 771
+           M664.71 771 676.71 771.002 M709.871 774.07 721.487 777.059
+           M749.036 794.851 754.026 805.683 M749.091 837.959 741.602 847.272
+           M710.943 858.521 698.969 857.916 M666.346 851.247 654.939 847.527
+           M624.035 835.005 613.163 829.925 M583.485 814.708 572.97 808.926"/>
+      <rect x="94" y="243" width="836" height="492" rx="48"
+            fill="none" stroke="#fff" stroke-width="34"/>
+      <rect x="478" y="727" width="68" height="78" rx="18"/>
+      <rect x="342" y="653" width="340" height="50" rx="25"/>
+      <circle cx="724" cy="487" r="113"/>
+      <circle cx="282" cy="499" r="72"/>
+      <circle cx="282" cy="499" r="89" fill="none" stroke="#fff" stroke-width="11"/>
+      <circle cx="187" cy="666" r="37"/>
+      <circle cx="837" cy="666" r="37"/>
+    </g>
+    <circle cx="698" cy="300" r="26"/>
+    <path d="M698 199a101 101 0 0 1 101 101 M698 97a203 203 0 0 1 203 203"
+          fill="none" stroke="#fff" stroke-width="37" stroke-linecap="round"/>
+  </g>
+</svg>
