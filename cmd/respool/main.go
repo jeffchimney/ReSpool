@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jeffchimney/respool/internal/auth"
 	"github.com/jeffchimney/respool/internal/library"
 	"github.com/jeffchimney/respool/internal/server"
 	"github.com/jeffchimney/respool/internal/uploads"
@@ -38,11 +39,16 @@ type config struct {
 	ShowVersion  bool
 	UploadDir    string
 	UploadLimit  int64 // bytes
+	Login        bool
+	DataDir      string
 }
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
 		os.Exit(healthcheck())
+	}
+	if len(os.Args) > 1 && os.Args[1] == "reset-login" {
+		os.Exit(resetLogin())
 	}
 	cfg, err := loadConfig(os.Args[1:])
 	if errors.Is(err, flag.ErrHelp) {
@@ -75,7 +81,7 @@ func loadConfig(args []string) (config, error) {
 	var c config
 	fs := flag.NewFlagSet("respool", flag.ContinueOnError)
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "Usage: respool [flags]\n       respool healthcheck\n\nEvery flag can also be set with the environment variable shown.\n\n")
+		fmt.Fprintf(fs.Output(), "Usage: respool [flags]\n       respool healthcheck\n       respool reset-login   remove the account so a new one can be created\n\nEvery flag can also be set with the environment variable shown.\n\n")
 		fs.PrintDefaults()
 	}
 	fs.StringVar(&c.MediaDir, "media", env("RESPOOL_MEDIA_DIR", "/media"), "folder of audio files to serve (RESPOOL_MEDIA_DIR)")
@@ -97,6 +103,12 @@ func loadConfig(args []string) (config, error) {
 		return c, fmt.Errorf("RESPOOL_UPLOAD_LIMIT_MB %q must be a positive number of megabytes", limitMB)
 	}
 	fs.Int64Var(&mb, "upload-limit-mb", mb, "largest upload accepted, in MiB (RESPOOL_UPLOAD_LIMIT_MB)")
+	login := env("RESPOOL_LOGIN", "false")
+	if c.Login, err = strconv.ParseBool(login); err != nil {
+		return c, fmt.Errorf("RESPOOL_LOGIN %q must be true or false", login)
+	}
+	fs.BoolVar(&c.Login, "login", c.Login, "require signing in to use the page; feeds stay reachable with the token (RESPOOL_LOGIN)")
+	fs.StringVar(&c.DataDir, "data", env("RESPOOL_DATA_DIR", ""), "writable folder where ReSpool keeps its account (RESPOOL_DATA_DIR)")
 	fs.BoolVar(&c.ShowVersion, "version", false, "print the version and exit")
 	if err := fs.Parse(args); err != nil {
 		return c, err
@@ -114,6 +126,9 @@ func loadConfig(args []string) (config, error) {
 	}
 	if c.Token != "" && !tokenRe.MatchString(c.Token) {
 		return c, errors.New("token may only contain letters, digits and . _ ~ -")
+	}
+	if c.Login && c.DataDir == "" {
+		return c, errors.New("signing in needs RESPOOL_DATA_DIR, a writable folder to keep the account in")
 	}
 	return c, nil
 }
@@ -148,6 +163,24 @@ func run(cfg config) error {
 		}
 	}
 	lib := library.New(logger, roots...)
+
+	var account *auth.Store
+	if cfg.Login {
+		// Fail rather than start without the password someone asked for.
+		var err error
+		if account, err = auth.Open(cfg.DataDir); err != nil {
+			return fmt.Errorf("signing in is on, but ReSpool can't use its data folder %q: %w", cfg.DataDir, err)
+		}
+		if cfg.Token == "" {
+			cfg.Token = account.FeedToken()
+			logger.Info("feed URLs use a token ReSpool made and keeps in its data folder")
+		}
+		if account.NeedsSetup() {
+			logger.Warn("create your account: open ReSpool and enter this setup code", "setup_code", account.SetupCode())
+		} else {
+			logger.Info("signing in is on", "username", account.Username())
+		}
+	}
 	go lib.Run(ctx, cfg.ScanInterval)
 
 	srv := &http.Server{
@@ -161,6 +194,7 @@ func run(cfg config) error {
 			Logger:      logger,
 			Uploads:     store,
 			UploadLimit: cfg.UploadLimit,
+			Auth:        account,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       2 * time.Minute,
@@ -174,9 +208,12 @@ func run(cfg config) error {
 	}()
 
 	indexPath := "/"
-	if cfg.Token != "" {
+	switch {
+	case account != nil:
+		// The page is behind the sign-in at /, which leads to the token URL.
+	case cfg.Token != "":
 		indexPath = "/" + cfg.Token + "/"
-	} else {
+	default:
 		logger.Warn("RESPOOL_TOKEN is not set: anyone who can reach this server can list and download your library")
 	}
 	logger.Info("respool started", "version", version, "addr", cfg.Addr, "media", cfg.MediaDir, "index", indexPath)
@@ -195,6 +232,22 @@ func within(dir, parent string) bool {
 	}
 	rel, err := filepath.Rel(parent, dir)
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+// resetLogin removes the account, for when its password is forgotten. Feed
+// URLs keep working; the next start prints a new setup code.
+func resetLogin() int {
+	dir := env("RESPOOL_DATA_DIR", "")
+	if dir == "" {
+		fmt.Fprintln(os.Stderr, "respool: set RESPOOL_DATA_DIR to the data folder that holds the account")
+		return 2
+	}
+	if err := auth.Reset(dir); err != nil {
+		fmt.Fprintln(os.Stderr, "respool:", err)
+		return 1
+	}
+	fmt.Println("The account is removed and every browser is signed out. Restart ReSpool, then create a new account with the setup code in its logs.")
+	return 0
 }
 
 // healthcheck lets the distroless image check itself without curl.

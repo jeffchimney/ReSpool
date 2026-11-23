@@ -11,6 +11,8 @@ services:
       # Audio added from the web page. A named volume is writable out of the
       # box; to use a host folder instead, make it writable by uid 65532.
       - uploads:/uploads
+      # ReSpool's account, when signing in is turned on below.
+      - data:/data
     environment:
       # Turns on "Add audio". Remove it to keep ReSpool read-only.
       RESPOOL_UPLOAD_DIR: /uploads
@@ -20,6 +22,9 @@ services:
       # breaks every feed you've subscribed to. Left empty, anyone on your
       # network can browse and download your library.
       RESPOOL_TOKEN: ""
+      # Require a username and password to use the page. Feeds keep working
+      # with the token. The setup code for the account is in `docker logs`.
+      # RESPOOL_LOGIN: "true"
       # Set this when feeds are reached through a reverse proxy or tunnel,
       # e.g. https://respool.your-tailnet.ts.net
       # RESPOOL_BASE_URL: ""
@@ -31,3 +36,4 @@ services:
 
 volumes:
   uploads:
+  data:

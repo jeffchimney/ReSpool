@@ -42,7 +42,8 @@ You need Docker and a folder of audio files.
    ```
 
    Leave out the `respool-uploads` line if you only want to serve the media
-   folder.
+   folder. To require a password for the page, see
+   [Signing in](#signing-in).
 
 3. **Open `http://<server-ip>:8080/<your-token>/`**, where `<server-ip>` is
    the address of the machine running Docker. On a computer, the page shows a
@@ -58,7 +59,8 @@ wrong, such as a folder ReSpool can't read (see
 ### Docker Compose
 
 Download [docker-compose.yml](docker-compose.yml), set your media folder and
-token in it, then start it:
+token in it, then start it. To require a password for the page, also
+uncomment `RESPOOL_LOGIN` (see [Signing in](#signing-in)).
 
 ```sh
 curl -O https://raw.githubusercontent.com/jeffchimney/ReSpool/main/docker-compose.yml
@@ -67,22 +69,24 @@ docker compose up -d
 
 ### Updating
 
-Pull the new image and recreate the container with the **same token**.
-Uploads are kept in the `respool-uploads` volume.
+Pull the new image and recreate the container with the **same token** and
+the same volumes. Uploads are kept in the `respool-uploads` volume, and your
+account, if you've turned on [signing in](#signing-in), in `respool-data`.
 
 ```sh
 docker pull ghcr.io/jeffchimney/respool:latest
 docker rm -f respool
 ```
 
-Then run the `docker run` command from step 2 again. With Compose, run
+Then run your `docker run` command again: the one from step 2, or the one
+from [Signing in](#signing-in). With Compose, run
 `docker compose pull && docker compose up -d`.
 
 ### File permissions
 
 ReSpool runs as an unprivileged user (uid 65532), not root. It has to be
-able to read your media folder and, if uploads are on, write to the uploads
-folder.
+able to read your media folder and, if they're on, write to the uploads and
+data folders.
 
 - **Media folder:** if your audio files aren't readable by everyone, run
   ReSpool as a user who can read them. Add `--user 1000:1000` to
@@ -93,6 +97,9 @@ folder.
   with `-v /path/to/uploads:/uploads` and give the user ReSpool runs as write
   access, for example `sudo chown 65532:65532 /path/to/uploads`. With
   `--user`, chown it to that user instead.
+- **Data folder:** the same goes for `respool-data` and `/data`, which holds
+  the account when [signing in](#signing-in) is on. If ReSpool can't write
+  there, it won't start.
 
 ## How folders become feeds
 
@@ -167,6 +174,98 @@ alongside it.
 Uploads arrive in a hidden `.incoming` folder and are only moved into place
 once complete, so a scan never picks up half a file.
 
+## Signing in
+
+ReSpool can ask for a username and password before it shows the page. It's
+off by default. To turn it on, add a volume for ReSpool's data and
+`RESPOOL_LOGIN=true` to the command from the quick start:
+
+```sh
+docker run -d --name respool --restart unless-stopped -p 8080:8080 \
+  -v /path/to/audiobooks:/media:ro \
+  -v respool-uploads:/uploads -e RESPOOL_UPLOAD_DIR=/uploads \
+  -v respool-data:/data -e RESPOOL_LOGIN=true \
+  -e RESPOOL_TOKEN=your-token \
+  ghcr.io/jeffchimney/respool:latest
+```
+
+With Compose, uncomment `RESPOOL_LOGIN: "true"` in
+[docker-compose.yml](docker-compose.yml). It already mounts the data volume.
+
+To add signing in to a ReSpool you already run, remove the container and
+start it again with those two extra settings (see [Updating](#updating)).
+Keep the same `RESPOOL_TOKEN` and your feed URLs don't change. If you ran
+ReSpool without a token, turning on signing in adds one to every feed URL,
+so you'll need to subscribe to your feeds again.
+
+### Creating your account
+
+1. **Find the setup code** with `docker logs respool`. It looks like
+   `setup_code=ABCD-EFGH`. The code proves you're the one running the
+   server, so nobody else on your network can create the account first. A
+   new code is printed every time ReSpool starts, until the account exists.
+2. **Open `http://<server-ip>:8080/`.** Enter the code and choose a username
+   and a password of 8 to 72 characters.
+3. From then on, the same address asks you to sign in, then takes you to your
+   library.
+
+### What it protects
+
+- **Behind your password:** the page and your library list, Add audio,
+  editing and deleting books, Rescan and OPML export.
+- **Not behind it:** feeds, audio, covers and chapters. Podcast apps can't
+  sign in, so these stay on their secret URLs, which include the token.
+  Someone with a feed URL can listen to that book, but can't open the page
+  or change anything.
+- **The token stays secret:** the sign-in page never shows it. ReSpool only
+  sends a browser to the URL with the token once it has signed in.
+- **Without `RESPOOL_TOKEN`,** ReSpool makes a token for feed URLs and keeps
+  it in the data volume, so feeds are never left without one.
+
+### Using it
+
+- **Each browser stays signed in for 30 days,** renewed while you keep using
+  it. If you're signed out while the page is open, the next time it talks to
+  ReSpool, for example when you save a change or press Rescan, it takes you
+  to the sign-in page.
+- **Usernames aren't case-sensitive.** Passwords are.
+- **The account button** at the top right of the page lets you change your
+  password, which signs out every other browser, and sign out.
+
+### How the account is kept safe
+
+- **The password is never stored.** ReSpool keeps a bcrypt hash of it in
+  `auth.json` in the data folder, which only ReSpool's user can read.
+- **The sign-in cookie** can't be read by scripts, and browsers don't send it
+  with forms or scripts on other websites, so another site can't make
+  changes as you. Over HTTPS, it's only ever sent over HTTPS.
+- **Guessing is slowed down.** After 10 wrong passwords or setup codes in 15
+  minutes, ReSpool makes that address wait before it can try again. Behind a
+  reverse proxy, every attempt comes from the proxy's address, so the limit
+  applies to everyone together.
+- **It never starts unprotected.** If signing in is on but the data folder is
+  missing or isn't writable, ReSpool stops with an error instead of starting
+  without a password.
+- **Keep the `respool-data` volume** when you update. It holds the account
+  and, if you didn't set `RESPOOL_TOKEN`, the token for your feed URLs.
+- **Sign in over HTTPS** when you're away from home. Over plain HTTP, the
+  password crosses the network unencrypted (see
+  [Listening away from home](#listening-away-from-home)).
+
+### Forgot your password?
+
+Remove the account and restart ReSpool, then create a new account with the
+new setup code from the logs. This signs out every browser. Feeds and
+uploads aren't affected.
+
+```sh
+docker exec respool /respool reset-login
+docker restart respool
+```
+
+Without Docker, run `RESPOOL_DATA_DIR=/path/to/data respool reset-login`,
+then restart ReSpool.
+
 ## Configuration
 
 Every setting is an environment variable (or the matching flag, see
@@ -183,6 +282,8 @@ Every setting is an environment variable (or the matching flag, see
 | `RESPOOL_LOG_LEVEL` | `info` | `debug` logs every request, including range requests. |
 | `RESPOOL_UPLOAD_DIR` | *(none)* | Writable folder for audio added from the web page. Unset, uploads are off. In Docker, use `/uploads` and mount a volume there. |
 | `RESPOOL_UPLOAD_LIMIT_MB` | `8192` | Largest upload accepted, in MiB. |
+| `RESPOOL_LOGIN` | `false` | `true` requires signing in to use the page. Feeds still work with the token. Needs `RESPOOL_DATA_DIR`. See [Signing in](#signing-in). |
+| `RESPOOL_DATA_DIR` | `/data` in Docker, otherwise *(none)* | Writable folder where ReSpool keeps its account, and the feed token it makes when `RESPOOL_TOKEN` isn't set. In Docker, mount a volume at `/data`. |
 
 ## Listening away from home
 
@@ -206,8 +307,12 @@ ReSpool is meant for your own library on your own network. Without
 `RESPOOL_TOKEN`, anyone who can reach the port can list and download every
 file, and upload files if uploads are on. With a token, URLs are
 unguessable, but anyone you share a feed URL with has the token, so they can
-download the whole library and upload to it. The media folder can, and
-should, be mounted read-only. Feeds carry `itunes:block` and `podcast:locked`
+download the whole library and upload to it. [Signing in](#signing-in)
+closes that gap: the page and every change need your password, and a feed
+URL only gets someone the feeds. Over plain HTTP, the password crosses your
+network unencrypted, like the token does, so use HTTPS (see above) when you
+sign in from outside your home network. The media folder can, and should, be
+mounted read-only. Feeds carry `itunes:block` and `podcast:locked`
 so directories and podcast hosts won't list or import them.
 
 Uploads only accept the audio and image formats listed above, checked by
@@ -220,6 +325,7 @@ can't upload through your browser.
 ```sh
 go test ./...
 go run ./cmd/respool -media ~/Audiobooks -log-level debug
+go run ./cmd/respool -media ~/Audiobooks -login -data ./data   # with signing in
 docker build -t respool .
 ```
 

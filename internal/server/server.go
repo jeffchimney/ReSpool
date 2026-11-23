@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jeffchimney/respool/internal/auth"
 	"github.com/jeffchimney/respool/internal/feed"
 	"github.com/jeffchimney/respool/internal/library"
 	"github.com/jeffchimney/respool/internal/media"
@@ -41,12 +42,17 @@ type Options struct {
 	Uploads *uploads.Store
 	// UploadLimit caps the size of one upload request, in bytes.
 	UploadLimit int64
+	// Auth, when set, puts the page and every change behind a sign-in.
+	// Feeds stay reachable with the token, since podcast apps can't sign in.
+	Auth *auth.Store
 }
 
 // Server is an http.Handler for a library.
 type Server struct {
 	opts         Options
 	mux          *http.ServeMux
+	authMux      *http.ServeMux // sign-in pages, outside the token
+	limiter      *auth.Limiter
 	placeholders sync.Map // feed ID → generated cover PNG
 }
 
@@ -74,6 +80,21 @@ func New(opts Options) *Server {
 	s.mux.HandleFunc("PATCH /books/{feed}", s.handleEditBook)
 	s.mux.HandleFunc("DELETE /books/{feed}", s.handleDeleteBook)
 	s.mux.HandleFunc("DELETE /books/{feed}/files/{file}", s.handleDeleteFile)
+	if opts.Auth != nil {
+		if s.opts.Token == "" {
+			// Feeds need a secret of their own once the page has a password.
+			s.opts.Token = opts.Auth.FeedToken()
+		}
+		s.limiter = auth.NewLimiter(10, 15*time.Minute)
+		s.authMux = http.NewServeMux()
+		s.authMux.HandleFunc("GET /{$}", s.handleRoot)
+		s.authMux.HandleFunc("GET /login", s.handleLoginPage)
+		s.authMux.HandleFunc("POST /login", s.handleLogin)
+		s.authMux.HandleFunc("POST /setup", s.handleSetup)
+		s.authMux.HandleFunc("POST /logout", s.handleLogout)
+		s.authMux.HandleFunc("GET /icon.svg", s.handleIcon)
+		s.mux.HandleFunc("POST /account/password", s.handleChangePassword)
+	}
 	return s
 }
 
@@ -95,6 +116,12 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "ok\n")
 		return
 	}
+	if s.authMux != nil {
+		if h, pattern := s.authMux.Handler(r); pattern != "" {
+			h.ServeHTTP(w, r)
+			return
+		}
+	}
 	if s.opts.Token != "" {
 		seg, rest, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
 		if subtle.ConstantTimeCompare([]byte(seg), []byte(s.opts.Token)) != 1 {
@@ -114,7 +141,22 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 		r2.URL = &u
 		r = &r2
 	}
+	if s.opts.Auth != nil && !feedPath(r.URL.Path) && !s.checkSession(w, r) {
+		s.signInFirst(w, r)
+		return
+	}
 	s.mux.ServeHTTP(w, r)
+}
+
+// feedPath reports whether p (without the token) is something podcast apps
+// fetch, which stays open to anyone with the token when sign-in is on.
+func feedPath(p string) bool {
+	for _, prefix := range []string{"/feeds/", "/audio/", "/covers/", "/chapters/"} {
+		if strings.HasPrefix(p, prefix) {
+			return true
+		}
+	}
+	return p == "/icon.svg"
 }
 
 func (s *Server) redact(p string) string {

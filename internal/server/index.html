@@ -46,6 +46,12 @@ header { display: flex; align-items: center; gap: 14px; padding: 32px 0 20px; }
 .mark { width: 52px; height: 52px; flex: none; border-radius: 12px; box-shadow: 0 4px 14px rgba(225, 19, 58, 0.28); }
 h1 { margin: 0; font-size: 34px; line-height: 1.1; font-weight: 700; letter-spacing: 0.01em; }
 .sub { margin: 2px 0 0; color: var(--muted); font-size: 15px; }
+.account {
+  margin-left: auto; flex: none; width: 40px; height: 40px;
+  display: grid; place-items: center; border: 0; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); cursor: pointer;
+}
+.account svg { width: 20px; height: 20px; }
 
 .hero {
   display: flex; gap: 22px; align-items: center; justify-content: space-between;
@@ -194,6 +200,9 @@ dialog.confirm { width: min(400px, calc(100vw - 32px)); }
       <h1>ReSpool</h1>
       {{if .Ready}}<p class="sub">{{len .Books}} {{if eq (len .Books) 1}}book{{else}}books{{end}} · {{.Episodes}} {{if eq .Episodes 1}}file{{else}}files{{end}}{{with .Duration}} · {{.}}{{end}}</p>{{end}}
     </div>
+    {{if .Login}}<button type="button" class="account" id="account" title="Account" aria-label="Account">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="7" r="3.5"/><path d="M3.5 17.5c.8-3.3 3.4-5 6.5-5s5.7 1.7 6.5 5"/></svg>
+    </button>{{end}}
   </header>
 
   <section class="hero">
@@ -260,6 +269,28 @@ dialog.confirm { width: min(400px, calc(100vw - 32px)); }
     {{if not .TokenSet}}<span class="warn">No access token set: anyone who can reach this server can open your feeds{{if .Uploads}} and upload files{{end}}.</span>{{end}}
   </footer>
 </div>
+{{if .Login}}
+<form id="logout-form" method="post" action="../logout" hidden></form>
+<dialog id="account-dialog" aria-labelledby="account-title">
+  <form id="password-form">
+    <h2 id="account-title">Account</h2>
+    <p class="hint">Signed in as <strong>{{.Username}}</strong>. Feed URLs work without signing in, so podcast apps keep updating.</p>
+    <input class="visually-hidden" name="username" value="{{.Username}}" autocomplete="username" tabindex="-1" aria-hidden="true">
+    <label class="field">Current password<input name="current" type="password" required autocomplete="current-password"></label>
+    <div class="fields">
+      <label class="field">New password<input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
+      <label class="field">Confirm new password<input name="confirm" type="password" required minlength="8" autocomplete="new-password"></label>
+    </div>
+    <p class="hint">Changing your password signs out every other browser.</p>
+    <p id="account-status" class="status" role="status" aria-live="polite"></p>
+    <div class="actions">
+      <button type="submit" form="logout-form" class="pill danger">Sign out</button>
+      <button type="button" class="pill" id="account-close">Close</button>
+      <button type="submit" class="pill primary" id="password-save">Change password</button>
+    </div>
+  </form>
+</dialog>
+{{end}}
 {{if .Uploads}}
 <dialog id="upload-dialog" aria-labelledby="upload-title">
   <form id="upload-form">
@@ -387,6 +418,59 @@ dialog.confirm { width: min(400px, calc(100vw - 32px)); }
     if (none) none.hidden = shown !== 0;
   });
 
+  // Calls ReSpool with its header, rejecting with the server's message. If
+  // the session ended, reloading takes the browser to the sign-in page.
+  function api(method, url, body) {
+    var opts = { method: method, headers: { "X-Requested-With": "ReSpool" } };
+    if (body instanceof FormData) {
+      opts.body = body;
+    } else if (body !== undefined) {
+      opts.headers["Content-Type"] = "application/json";
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(url, opts).then(function (res) {
+      if (res.status === 401) location.reload();
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok) throw new Error(data.error || "That didn't work (" + res.status + ").");
+        return data;
+      });
+    });
+  }
+
+  var accountDialog = document.getElementById("account-dialog");
+  if (accountDialog) {
+    var passwordForm = document.getElementById("password-form");
+    var passwordSave = document.getElementById("password-save");
+    var accountStatus = document.getElementById("account-status");
+    var accountSay = function (text, isError) {
+      accountStatus.textContent = text;
+      accountStatus.classList.toggle("error", !!isError);
+    };
+    document.getElementById("account").addEventListener("click", function () {
+      passwordForm.reset();
+      accountSay("");
+      accountDialog.showModal();
+    });
+    document.getElementById("account-close").addEventListener("click", function () { accountDialog.close(); });
+    passwordForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      passwordSave.disabled = true;
+      accountSay("Saving…");
+      api("POST", "account/password", {
+        current: passwordForm.elements.current.value,
+        password: passwordForm.elements.password.value,
+        confirm: passwordForm.elements.confirm.value
+      }).then(function () {
+        passwordSave.disabled = false;
+        passwordForm.reset();
+        accountSay("Password changed. Any other browsers are signed out.");
+      }, function (err) {
+        passwordSave.disabled = false;
+        accountSay(err.message, true);
+      });
+    });
+  }
+
   var dialog = document.getElementById("upload-dialog");
 
   // While a scan runs the page refreshes itself, but never in the middle of
@@ -496,6 +580,7 @@ dialog.confirm { width: min(400px, calc(100vw - 32px)); }
       say("Processing…");
     };
     xhr.onload = function () {
+      if (xhr.status === 401) { location.reload(); return; }
       var res = {};
       try { res = JSON.parse(xhr.responseText); } catch (err) {}
       if (xhr.status === 200) {
@@ -533,22 +618,6 @@ dialog.confirm { width: min(400px, calc(100vw - 32px)); }
   function editSay(text, isError) {
     editStatus.textContent = text;
     editStatus.classList.toggle("error", !!isError);
-  }
-  // Calls ReSpool with its header, rejecting with the server's message.
-  function api(method, url, body) {
-    var opts = { method: method, headers: { "X-Requested-With": "ReSpool" } };
-    if (body instanceof FormData) {
-      opts.body = body;
-    } else if (body !== undefined) {
-      opts.headers["Content-Type"] = "application/json";
-      opts.body = JSON.stringify(body);
-    }
-    return fetch(url, opts).then(function (res) {
-      return res.json().catch(function () { return {}; }).then(function (data) {
-        if (!res.ok) throw new Error(data.error || "That didn't work (" + res.status + ").");
-        return data;
-      });
-    });
   }
   function confirmAction(title, text, action) {
     document.getElementById("confirm-title").textContent = title;

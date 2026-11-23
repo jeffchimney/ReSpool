@@ -49,6 +49,9 @@ type indexView struct {
 	Uploads     bool
 	UploadLimit string
 	UploadBooks []uploadBook // books that more files can be added to
+
+	Login    bool // sign-in is on
+	Username string
 }
 
 type uploadBook struct{ ID, Title string }
@@ -68,6 +71,9 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	if v.Uploads {
 		v.UploadLimit = humanBytes(s.opts.UploadLimit)
+	}
+	if s.opts.Auth != nil {
+		v.Login, v.Username = true, s.opts.Auth.Username()
 	}
 	if snap != nil {
 		var total time.Duration
