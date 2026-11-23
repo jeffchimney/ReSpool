@@ -192,7 +192,7 @@ dialog.confirm { width: min(400px, calc(100vw - 32px)); }
     <img class="mark" src="icon.svg?v=2" alt="">
     <div>
       <h1>ReSpool</h1>
-      {{if .Ready}}<p class="sub">{{len .Books}} {{if eq (len .Books) 1}}book{{else}}books{{end}} · {{.Episodes}} files{{with .Duration}} · {{.}}{{end}}</p>{{end}}
+      {{if .Ready}}<p class="sub">{{len .Books}} {{if eq (len .Books) 1}}book{{else}}books{{end}} · {{.Episodes}} {{if eq .Episodes 1}}file{{else}}files{{end}}{{with .Duration}} · {{.}}{{end}}</p>{{end}}
     </div>
   </header>
 

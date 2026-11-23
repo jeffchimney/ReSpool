@@ -131,6 +131,20 @@ func TestIndex(t *testing.T) {
 	}
 }
 
+func TestIndexCounts(t *testing.T) {
+	s, _ := newServer(t)
+	if html := body(t, get(t, s, "/"+token+"/")); !strings.Contains(html, "2 books · 3 files") {
+		t.Error(`index doesn't say "2 books · 3 files"`)
+	}
+
+	s, _ = newUploadServer(t, DefaultUploadLimit)
+	postUpload(t, s, true, nil, "tagged.mp3")
+	html := body(t, get(t, s, "/"+token+"/"))
+	if !strings.Contains(html, "1 book · 1 file") || strings.Contains(html, "1 files") {
+		t.Error(`index doesn't say "1 book · 1 file"`)
+	}
+}
+
 func TestFeed(t *testing.T) {
 	s, snap := newServer(t)
 	f := feedFor(t, snap, "Two Parts")
