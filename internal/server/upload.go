@@ -71,7 +71,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	if f := feedInDir(s.rescanNow(), res.Dir); f != nil {
 		out.Title, out.FeedURL = f.Title, s.links(r).Feed(f)
 	}
-	s.opts.Logger.Info("upload added", "book", out.Title, "files", out.Files, "cover", out.Cover)
+	s.opts.Logger.Info("upload added", "show", out.Title, "files", out.Files, "cover", out.Cover)
 	writeJSON(w, http.StatusOK, out)
 }
 

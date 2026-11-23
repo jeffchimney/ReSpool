@@ -6,8 +6,8 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      # Your audiobooks, mounted read-only. ReSpool never writes to this folder.
-      - /path/to/audiobooks:/media:ro
+      # Your audio folder, mounted read-only. ReSpool never writes to it.
+      - /path/to/audio:/media:ro
       # Audio added from the web page. A named volume is writable out of the
       # box; to use a host folder instead, make it writable by uid 65532.
       - uploads:/uploads

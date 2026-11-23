@@ -51,7 +51,7 @@ func (s *Server) uploadedBook(w http.ResponseWriter, r *http.Request) *library.F
 	}
 	f := s.snapshot().Feed(r.PathValue("feed"))
 	if f == nil || !s.opts.Uploads.Holds(f.Dir) {
-		writeJSON(w, http.StatusNotFound, bookResponse{Error: "That book isn't one you uploaded, so it can't be changed here."})
+		writeJSON(w, http.StatusNotFound, bookResponse{Error: "That show isn't one you uploaded, so it can't be changed here."})
 		return nil
 	}
 	return f
@@ -94,7 +94,7 @@ func (s *Server) handleEditBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.opts.Uploads.Edit(f.Dir, o); err != nil {
-		s.bookError(w, "editing book", err)
+		s.bookError(w, "editing show", err)
 		return
 	}
 	out := bookResponse{}
@@ -110,7 +110,7 @@ func (s *Server) handleDeleteBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.opts.Uploads.Delete(f.Dir); err != nil {
-		s.bookError(w, "deleting book", err)
+		s.bookError(w, "deleting show", err)
 		return
 	}
 	s.rescanNow()

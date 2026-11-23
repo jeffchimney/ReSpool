@@ -148,7 +148,7 @@ func (s *Store) Receive(mr *multipart.Reader, resolve func(feedID string) (dir s
 	if into != "" {
 		dir, ok := resolve(into)
 		if !ok || !s.Holds(dir) {
-			return Result{}, userErr("Files can only be added to books that were uploaded to ReSpool.")
+			return Result{}, userErr("Files can only be added to shows that were uploaded to ReSpool.")
 		}
 		return s.file(dir, audio, cover, library.Overrides{})
 	}
@@ -369,7 +369,7 @@ func firstNonEmpty(values ...string) string {
 // so the book's feed URL stays the same.
 func (s *Store) Edit(dir string, o library.Overrides) error {
 	if !s.Holds(dir) {
-		return userErr("Only books uploaded to ReSpool can be edited here.")
+		return userErr("Only shows uploaded to ReSpool can be edited here.")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -379,7 +379,7 @@ func (s *Store) Edit(dir string, o library.Overrides) error {
 // Delete permanently removes an uploaded book's folder and everything in it.
 func (s *Store) Delete(dir string) error {
 	if !s.Holds(dir) {
-		return userErr("Only books uploaded to ReSpool can be deleted here.")
+		return userErr("Only shows uploaded to ReSpool can be deleted here.")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -387,7 +387,7 @@ func (s *Store) Delete(dir string) error {
 		return err
 	}
 	s.pruneParents(dir)
-	s.logger.Info("uploaded book deleted", "dir", dir)
+	s.logger.Info("uploaded show deleted", "dir", dir)
 	return nil
 }
 
@@ -397,7 +397,7 @@ func (s *Store) Delete(dir string) error {
 func (s *Store) DeleteFile(dir, file string) (bookGone bool, err error) {
 	rel, err := filepath.Rel(dir, file)
 	if !s.Holds(dir) || err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return false, userErr("Only files in books uploaded to ReSpool can be removed here.")
+		return false, userErr("Only files in shows uploaded to ReSpool can be removed here.")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

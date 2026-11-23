@@ -1,13 +1,15 @@
 # ReSpool
 
-ReSpool serves a folder of audiobooks and other audio files as podcast feeds,
-so you can listen to them in any podcast app that lets you add a feed by URL.
+ReSpool serves a folder of audiobooks, lectures, courses and other long-form
+audio as podcast feeds, so you can listen to them in any podcast app that
+lets you add a feed by URL.
 
-Point it at a folder. Every book in it gets its own feed. Open the web page,
-copy a feed URL and paste it into your podcast app.
+Point it at a folder. Every show in it, whether that's an audiobook, a
+course or a series, gets its own feed. Open the web page, copy a feed URL
+and paste it into your podcast app.
 
-The name is RSS + Spool: it was made for following local audiobooks in the
-Spool podcast app, and it works with any app that can add a feed by URL.
+The name is RSS + Spool: it was made for following local audio in the Spool
+podcast app, and it works with any app that can add a feed by URL.
 
 - Zero configuration and no database. Your folder layout and file tags are
   the source of truth.
@@ -15,7 +17,7 @@ Spool podcast app, and it works with any app that can add a feed by URL.
   QuickTime), and works out durations without ffmpeg.
 - Serves byte ranges, so players can stream and seek.
 - Optionally, add audio from the web page: uploads are checked, filed into a
-  book folder of their own and show up as a feed right away.
+  folder of their own and show up as a feed right away.
 - One small static binary in a distroless image for amd64, arm64 and armv7
   (Synology, Unraid, Raspberry Pi…).
 
@@ -35,7 +37,7 @@ You need Docker and a folder of audio files.
 
    ```sh
    docker run -d --name respool --restart unless-stopped -p 8080:8080 \
-     -v /path/to/audiobooks:/media:ro \
+     -v /path/to/audio:/media:ro \
      -v respool-uploads:/uploads -e RESPOOL_UPLOAD_DIR=/uploads \
      -e RESPOOL_TOKEN=your-token \
      ghcr.io/jeffchimney/respool:latest
@@ -49,7 +51,7 @@ You need Docker and a folder of audio files.
    the address of the machine running Docker. On a computer, the page shows a
    QR code you can scan to open it on your phone.
 
-4. **Subscribe:** copy a book's feed URL and add it to your podcast app. Most
+4. **Subscribe:** copy a show's feed URL and add it to your podcast app. Most
    apps have an option like "Add by URL", or let you paste it into search.
 
 If the page is empty or won't load, `docker logs respool` shows what went
@@ -114,24 +116,27 @@ data folders.
 │   ├── CD1/02 Roast Mutton.mp3
 │   ├── CD2/01 A Short Rest.mp3
 │   └── description.txt
+├── Intro to Astronomy/           → a course or series works the same way
+│   ├── Lecture 01.mp3
+│   └── Lecture 02.mp3
 └── Dune.m4b                      → loose files in the root get a feed each
 ```
 
 - **A folder containing audio files is a feed.** Nested folders are fine;
   each folder that directly holds audio is its own feed.
 - **Disc folders** named like `CD1`, `Disc 2` or `disk_03` are merged into
-  their parent book.
+  their parent show.
 - **Episode order:** track and disc tags when every file has a distinct track
   number, otherwise natural filename order (`Part 2` before `Part 10`). Feeds
   are marked as serial and episodes are numbered, so apps play them in order.
 - **Titles:** the album tag (or the folder name) for the feed, the title tag
   (or the filename) for each episode. If every file has the same title tag,
   filenames are used instead.
-- **Overrides:** a `respool.json` in a book's folder beats the tags, e.g.
+- **Overrides:** a `respool.json` in a show's folder beats the tags, e.g.
   `{"title": "Dune", "author": "Frank Herbert", "description": "…"}`. Any
   field can be left out. The feed URL doesn't change.
 - **Cover art:** `cover`, `folder`, `front` or `poster` `.jpg`/`.png` in the
-  book's folder, then any single image there, then art embedded in the audio,
+  show's folder, then any single image there, then art embedded in the audio,
   then a generated placeholder. A loose `Dune.m4b` uses `Dune.jpg`.
 - **Description:** `description.txt` or `desc.txt` in the folder (`Dune.txt`
   for a loose file), then the file's description or comment tag.
@@ -141,8 +146,8 @@ data folders.
 - Supported formats: mp3, m4a, m4b, aac, flac, ogg, opus and wav. Hidden
   files and NAS folders such as `@eaDir` and `#recycle` are ignored.
 
-Feed URLs are derived from each book's path, so they survive restarts and
-rescans. Renaming or moving a book's folder gives it a new feed URL.
+Feed URLs are derived from each show's path, so they survive restarts and
+rescans. Renaming or moving a show's folder gives it a new feed URL.
 
 ## Adding audio from the web page
 
@@ -151,20 +156,20 @@ audio** button (you can also drop files anywhere on the page). Your media
 folder stays read-only: uploads live in their own folder, which ReSpool scans
 alongside it.
 
-- **One upload is one book.** Give it a title and author, or leave them blank
+- **One upload is one show.** Give it a title and author, or leave them blank
   to take them from the files' tags (album and artist). Uploads are filed as
   `Author/Title/` inside the uploads folder, and anything you type is saved
-  in the book's `respool.json`, so it wins over the tags.
-- **Add to an existing book** by picking it in the dialog, or with **Add
-  audio** in the book's edit dialog, for example to add the next part. Files
+  in the show's `respool.json`, so it wins over the tags.
+- **Add to an existing show** by picking it in the dialog, or with **Add
+  audio** in the show's edit dialog, for example to add the next part. Files
   with names that are already taken get a number.
-- **Include a JPEG or PNG** to use it as the book's cover.
-- **Edit uploaded books** with the **⋯** button on their card: change the
+- **Include a JPEG or PNG** to use it as the show's cover.
+- **Edit uploaded shows** with the **⋯** button on their card: change the
   title, author, description and cover, remove single files, or delete the
-  whole book. Renaming only changes what podcast apps show; the folder stays
+  whole show. Renaming only changes what podcast apps show; the folder stays
   put, so the feed URL and existing subscriptions keep working. Deleting is
   permanent and asks first.
-- Books in your media folder can't be changed from the page, since ReSpool
+- Shows in your media folder can't be changed from the page, since ReSpool
   never writes there. Use a `respool.json` (see above) to fix their details.
 - Every file is checked against its extension's format before anything is
   saved, so a mislabelled or partial upload is rejected as a whole.
@@ -182,7 +187,7 @@ off by default. To turn it on, add a volume for ReSpool's data and
 
 ```sh
 docker run -d --name respool --restart unless-stopped -p 8080:8080 \
-  -v /path/to/audiobooks:/media:ro \
+  -v /path/to/audio:/media:ro \
   -v respool-uploads:/uploads -e RESPOOL_UPLOAD_DIR=/uploads \
   -v respool-data:/data -e RESPOOL_LOGIN=true \
   -e RESPOOL_TOKEN=your-token \
@@ -212,10 +217,10 @@ so you'll need to subscribe to your feeds again.
 ### What it protects
 
 - **Behind your password:** the page and your library list, Add audio,
-  editing and deleting books, Rescan and OPML export.
+  editing and deleting shows, Rescan and OPML export.
 - **Not behind it:** feeds, audio, covers and chapters. Podcast apps can't
   sign in, so these stay on their secret URLs, which include the token.
-  Someone with a feed URL can listen to that book, but can't open the page
+  Someone with a feed URL can listen to that show, but can't open the page
   or change anything.
 - **The token stays secret:** the sign-in page never shows it. ReSpool only
   sends a browser to the URL with the token once it has signed in.
@@ -324,8 +329,8 @@ can't upload through your browser.
 
 ```sh
 go test ./...
-go run ./cmd/respool -media ~/Audiobooks -log-level debug
-go run ./cmd/respool -media ~/Audiobooks -login -data ./data   # with signing in
+go run ./cmd/respool -media ~/Audio -log-level debug
+go run ./cmd/respool -media ~/Audio -login -data ./data   # with signing in
 docker build -t respool .
 ```
 

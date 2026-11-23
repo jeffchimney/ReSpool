@@ -31,5 +31,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 CMD ["/res
 ENTRYPOINT ["/respool"]
 
 LABEL org.opencontainers.image.title="ReSpool" \
-      org.opencontainers.image.description="Serve your audiobooks and audio files as podcast feeds" \
+      org.opencontainers.image.description="Serve audiobooks, lectures and other long-form audio as podcast feeds" \
       org.opencontainers.image.licenses="MIT"
