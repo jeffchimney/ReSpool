@@ -48,8 +48,8 @@ You need Docker and a folder of audio files.
    the address of the machine running Docker. On a computer, the page shows a
    QR code you can scan to open it on your phone.
 
-4. **Subscribe:** copy a book's feed URL and add it to your podcast app. In
-   Spool, paste it into search.
+4. **Subscribe:** copy a book's feed URL and add it to your podcast app. Most
+   apps have an option like "Add by URL", or let you paste it into search.
 
 If the page is empty or won't load, `docker logs respool` shows what went
 wrong, such as a folder ReSpool can't read (see

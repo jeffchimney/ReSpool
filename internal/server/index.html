@@ -198,8 +198,8 @@ dialog.confirm { width: min(400px, calc(100vw - 32px)); }
 
   <section class="hero">
     <div>
-      <h2>Copy a feed, paste it into Spool.</h2>
-      <p>Paste the URL into Spool's search field, or into any podcast app that takes a feed URL. Every folder of audio files is its own feed, and new files appear after the next scan.</p>
+      <h2>Copy a feed, add it to your podcast app.</h2>
+      <p>Most podcast apps can follow a show by its URL, with an option like "Add by URL" or by pasting it into search. Every folder of audio files is its own feed, and new files appear after the next scan.</p>
       {{if .Loopback}}<p>To subscribe from your phone, open this page at this computer's network address, like <code>http://192.168.1.20:8080</code>, instead of localhost.</p>{{end}}
     </div>
     {{if not .Loopback}}<figure class="qr"><img src="{{.QRURL}}" alt="QR code for this page"><figcaption>Open on your phone</figcaption></figure>{{end}}
